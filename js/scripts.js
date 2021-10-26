@@ -18,7 +18,9 @@ class Game {
       this.ctx = this.canvas.getContext('2d');
     }
     this.drawBackground();
-    this.road = new Road(this.ctx, Game.ROAD_X, Game.ROAD_Y);
+      this.road = new Road(this.ctx);
+
+      // this.road = new Road(this.ctx, Game.ROAD_X, Game.ROAD_Y);
     this.road.draw();
 
     this.car = new Car(this.ctx, Game.ROAD_X + 135, 400);
@@ -46,7 +48,7 @@ class Game {
 
 
   drawBackground() {
-      this.ctx.fillStyle = "black";
+      this.ctx.fillStyle = "green";
       this.ctx.fillRect(0,0,800, 600);
   }
 
@@ -64,41 +66,150 @@ class Game {
 
 }
 
+
 class Road {
-  x;
-  y;
-  ctx;
-  middleStrip;
-  leftSideStrip;
-  rightSideStrip;
-  static ROAD_WIDTH = 200;
-  static ROAD_HEIGHT = 600;
+    current;
+    prev;
+    ctx;
+    static ROAD_WIDTH = 300;
+    init
+    tracks;
+    currentTrack;
+    prevTrack;
 
-  constructor(ctx, x, y) {
-      this.ctx = ctx;
-      this.x = x;
-      this.y = y;
-      this.middleStrip = new MiddleStrip(this.ctx, this.x + Road.ROAD_WIDTH/2 - MiddleStrip.STRIP_WIDTH/2, this.y);
-      this.leftSideStrip = new SideStrip(this.ctx, this.x - SideStrip.STRIP_WIDTH/2, this.y);
-      this.rightSideStrip = new SideStrip(this.ctx, this.x + Road.ROAD_WIDTH, this.y);
+    constructor(ctx) {
+        this.ctx = ctx;
+        this.tracks = [this.draw1];
+        this.currentTrack = this.drawInit;
+        this.prevTrack = null;
+        this.current = 0;
+        this.new = 0;
+        this.init = true;
+    }
 
-  }
+    draw() {
+        this.currentTrack(this.current);
+        if (this.prevTrack !== null) {
+            this.prevTrack(this.prev);
+        }
 
-  draw() {
-      this.ctx.fillStyle = 'grey';
-      this.ctx.fillRect(this.x, this.y, Road.ROAD_WIDTH, Road.ROAD_HEIGHT);
-      this.middleStrip.draw();
-      this.leftSideStrip.draw();
-      this.rightSideStrip.draw();
-  }
+        if (this.current === 1000) {
+            this.prevTrack = this.currentTrack;
+            this.currentTrack = this.draw1;
+            this.prev = 1000;
+            this.current = 0;
+        }
+        console.log("position=" + this.current);
+    }
 
-  move()  {
-      this.middleStrip.move();
-      this.leftSideStrip.move();
-      this.rightSideStrip.move();
-  }
+    drawInit(Y) {
+        this.ctx.translate(0,0);
+        // this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.setLineDash([]);
+        this.ctx.strokeStyle = 'grey';
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, 800 + Y);
+        this.ctx.lineWidth = Road.ROAD_WIDTH;
 
+        this.ctx.stroke();
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'white';
+        this.ctx.setLineDash([40, 10]);
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, 800 + Y);
+        this.ctx.lineWidth = 15;
+        this.ctx.stroke();
+        // this.ctx.restore();
+        // this.ctx.closePath();
+    }
+
+    draw1(Y) {
+        this.ctx.translate(0,0);
+        // this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.setLineDash([]);
+        this.ctx.strokeStyle = 'grey';
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, -800 + Y);
+        this.ctx.lineTo(500, -400 + Y);
+        this.ctx.lineTo(300, -200 + Y);
+        this.ctx.lineTo(300, 0 + Y);
+        this.ctx.lineWidth = Road.ROAD_WIDTH;
+
+        this.ctx.stroke();
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'white';
+        this.ctx.setLineDash([40, 10]);
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, -800 + Y);
+        this.ctx.lineTo(500, -400 + Y);
+        this.ctx.lineTo(300, -200 + Y);
+        this.ctx.lineTo(300, 0 + Y);
+        this.ctx.lineWidth = 15;
+        this.ctx.stroke();
+
+    }
+
+    move()  {
+        this.current += 10;
+        this.prev += 10;
+    }
 }
+//
+// class Road {
+//   x;
+//   y;
+//   ctx;
+//   middleStrip;
+//   leftSideStrip;
+//   rightSideStrip;
+//   static ROAD_WIDTH = 200;
+//   static ROAD_HEIGHT = 600;
+//
+//   constructor(ctx, x, y) {
+//       this.ctx = ctx;
+//       this.x = x;
+//       this.y = y;
+//       this.middleStrip = new MiddleStrip(this.ctx, this.x + Road.ROAD_WIDTH/2 - MiddleStrip.STRIP_WIDTH/2, this.y);
+//       this.leftSideStrip = new SideStrip(this.ctx, this.x - SideStrip.STRIP_WIDTH/2, this.y);
+//       this.rightSideStrip = new SideStrip(this.ctx, this.x + Road.ROAD_WIDTH, this.y);
+//
+//   }
+//
+//   draw() {
+//       this.ctx.save();
+//       this.ctx.translate(this.x, this.y);
+//       this.ctx.fillStyle = 'grey';
+//       this.ctx.fillRect(0, 300 , Road.ROAD_WIDTH, 300);
+//       this.ctx.restore();
+//       this.ctx.save();
+//       this.ctx.translate(this.x, this.y);
+//       this.ctx.setTransform(1,0,1,1,1,0);
+//       this.ctx.fillStyle = 'grey';
+//       this.ctx.fillRect(0-52, 0 , Road.ROAD_WIDTH, 300);
+//       this.ctx.restore();
+//
+//       // this.ctx.fillRect(this.x, this.y, Road.ROAD_WIDTH, Road.ROAD_HEIGHT);
+//       // this.ctx.fillStyle = 'grey';
+//       // this.ctx.fillRect(this.x, this.y, Road.ROAD_WIDTH, Road.ROAD_HEIGHT);
+//       // this.middleStrip.draw();
+//       // this.leftSideStrip.draw();
+//       // this.rightSideStrip.draw();
+//   }
+//
+//   move()  {
+//       this.middleStrip.move();
+//       this.leftSideStrip.move();
+//       this.rightSideStrip.move();
+//       window.requestAnimationFrame(this.move);
+//   }
+//
+//   drawTurn() {
+//
+//   }
+//
+// }
 
 class MiddleStrip {
     x;
@@ -196,38 +307,53 @@ class Car {
             case directions.LEFT:
                 this.drawLeft();
                 break;
+            case directions.RIGHT:
+                this.drawRight();
+                break;
         }
     }
 
     drawNone() {
+        this.ctx.save();
+        this.ctx.translate(this.postition, this.y);
+        this.drawTire(0, 20);
+        this.drawTire(0, 45);
+        this.drawTire(35, 20);
+        this.drawTire(35, 45);
         this.ctx.fillStyle = 'red';
-        this.ctx.fillRect(this.postition, this.y, Car.CAR_WIDTH, Car.CAR_HEIGHT);
-        this.ctx.fillStyle = 'black';
-
-        this.drawTire(this.postition, this.y + 20);
-        this.drawTire(this.postition, this.y + 50);
-        this.drawTire(this.postition + 35, this.y + 20);
-        this.drawTire(this.postition + 35, this.y + 50);
+        this.ctx.fillRect(0,0, Car.CAR_WIDTH, Car.CAR_HEIGHT);
+        this.ctx.restore();
     }
 
     drawLeft() {
-        // Rotated rectangle
-        this.ctx.save();
-        this.ctx.translate(this.x + Car.CAR_WIDTH, this.y + Car.CAR_HEIGHT);
-        this.ctx.rotate(Math.PI / 180);
-        // this.ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        this.ctx.save()
+        this.ctx.translate(this.postition, this.y);
+        this.ctx.rotate(-Math.PI/10);
+        this.drawTire(0, 20);
+        this.drawTire(0, 45);
+        this.drawTire(35, 20);
+        this.drawTire(35, 45);
         this.ctx.fillStyle = 'red';
-        this.ctx.fillRect(this.postition, this.y, Car.CAR_WIDTH, Car.CAR_HEIGHT);
+        this.ctx.fillRect(0,0, Car.CAR_WIDTH, Car.CAR_HEIGHT);
         this.ctx.restore();
-        this.ctx.fillStyle = 'black';
-
-        this.drawTire(this.postition, this.y + 20);
-        this.drawTire(this.postition, this.y + 50);
-        this.drawTire(this.postition + 35, this.y + 20);
-        this.drawTire(this.postition + 35, this.y + 50);
     }
 
+    drawRight() {
+        this.ctx.save()
+        this.ctx.translate(this.postition, this.y);
+        this.ctx.rotate(Math.PI/10);
+        this.drawTire(0, 20);
+        this.drawTire(0, 45);
+        this.drawTire(35, 20);
+        this.drawTire(35, 45);
+        this.ctx.fillStyle = 'red';
+        this.ctx.fillRect(0,0, Car.CAR_WIDTH, Car.CAR_HEIGHT);
+        this.ctx.restore();
+    }
+
+
     drawTire(x, y) {
+        this.ctx.fillStyle = 'black';
         this.ctx.beginPath();
         this.ctx.ellipse(x, y, 4, 7, 0, 0, 2 * Math.PI);
         this.ctx.fill();
