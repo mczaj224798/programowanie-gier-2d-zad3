@@ -36,12 +36,13 @@ class Game {
     this.keyInterval = setInterval(e => {
         if (this.keyHandler.arrowUp) {
             this.road.move();
-            // this.obstacles.move();
         }
         if (this.keyHandler.arrowLeft) {
-            console.log(this.car, this.road.obstacles);
+            // console.log(this.car, this.road.obstacles);
             this.car.direction = directions.LEFT;
             this.car.moveLeft();
+
+
         } else if (this.keyHandler.arrowRight) {
             this.car.direction = directions.RIGHT;
             this.car.moveRight();
@@ -71,15 +72,33 @@ class Game {
       this.drawBackground()
       this.road.draw();
       this.car.draw();
-      this.road.obstacles.forEach(obstacle => {
-          if (obstacle.calculateHit(this.car)) {
-              this.gameOver();
-              // this.scoreboard.increment();
-              // console.log("HIT")
+
+      if (this.road.calculateRoadColiision(this.car.postition, Game.CAR_Y)) {
+          console.log("XXX")
+          this.gameOver();
+          return;
+      }
+
+      this.road.pointers.forEach(obstacle => {
+          if (obstacle.calculateHit(this.car) && obstacle.hit === false) {
+              this.scoreboard.increment();
+              obstacle.hit = true;
           } else {
               obstacle.draw()
           }
       });
+
+      this.road.obstacles.forEach(obstacle => {
+          if (obstacle.calculateHit(this.car)) {
+              this.gameOver();
+              console.log("HIT")
+              return;
+          } else {
+              obstacle.draw()
+          }
+      });
+
+
 
       this.scoreboard.draw();
   }
@@ -97,23 +116,18 @@ class Game {
   }
 }
 
-class Obstacle {
+class Hitable {
     x;
     y;
     ctx;
-    static WIDTH = 100;
-    static HEIGHT = 30;
+    height;
+    width
     constructor(ctx, x, y) {
         this.ctx = ctx;
         this.x = x;
         this.y = y;
-    }
-
-    draw() {
-        this.ctx.save();
-        this.ctx.fillStyle = "black";
-        this.ctx.fillRect(this.x, this.y , Obstacle.WIDTH, Obstacle.HEIGHT);
-        this.ctx.restore();
+        // this.height = 0;
+        // this.width = 0;
     }
 
     move() {
@@ -132,10 +146,49 @@ class Obstacle {
         // y1 - this.y + Obstacle.HEIGHT
         // x2 - this.x + Obstacle.WIDTH
         // y2 - this.y
-        let res = this.pointInRect(this.x, this.y + Obstacle.HEIGHT, this.x + Obstacle.WIDTH, this.y, car.postition, Game.CAR_Y) ||
-            this.pointInRect(this.x , this.y + Obstacle.HEIGHT, this.x + Obstacle.WIDTH, this.y, car.postition + Car.CAR_WIDTH, Game.CAR_Y);
+        let res = this.pointInRect(this.x, this.y + this.height, this.x + this.width, this.y, car.postition, Game.CAR_Y) ||
+            this.pointInRect(this.x , this.y + this.height, this.x + this.width, this.y, car.postition + Car.CAR_WIDTH, Game.CAR_Y);
         return res;
 
+    }
+}
+
+
+class Obstacle extends Hitable {
+    static WIDTH = 100;
+    static HEIGHT = 20;
+    constructor(ctx, x, y) {
+        super(ctx, x, y);
+        this.height = Obstacle.HEIGHT;
+        this.width = Obstacle.WIDTH;
+    }
+
+    draw() {
+        this.ctx.save();
+        this.ctx.fillStyle = "black";
+        this.ctx.fillRect(this.x, this.y , Obstacle.WIDTH, Obstacle.HEIGHT);
+        this.ctx.restore();
+    }
+}
+
+class Pointer extends Hitable {
+    static WIDTH = 40;
+    static HEIGHT = 40;
+    hit
+    constructor(ctx, x, y) {
+        super(ctx, x, y);
+        this.height = Pointer.HEIGHT;
+        this.width = Pointer.WIDTH;
+        this.hit = false;
+    }
+
+    draw() {
+        if (!this.hit) {
+            this.ctx.save();
+            this.ctx.fillStyle = "blue";
+            this.ctx.fillRect(this.x, this.y, Pointer.WIDTH, Pointer.HEIGHT);
+            this.ctx.restore();
+        }
     }
 }
 
@@ -152,54 +205,60 @@ class Road {
     prevTrack;
     static STEP = 10;
     obstacles
-    obstaclesCords
+    pointers
     switchCounter
 
     constructor(ctx) {
         this.ctx = ctx;
-        this.tracks = [this.draw1, this.draw2, this.draw3, this.draw4];
-        this.currentTrack = this.drawInit;
+        this.currentTrack = new RoadPresetInit(this.ctx);
+        // this.currentTrack = this.drawInit;
+
         this.prevTrack = null;
         this.current = 0;
         this.switchCounter = 0;
         this.init = true;
 
-        this.obstaclesCords = new Map();
-        this.trackCords = new Map();
-
-        this.obstaclesCords.set(this.drawInit, [250, 250, 250, 250]);
-        this.obstaclesCords.set(this.draw1, [250, 260, 360, 430]);
-        this.obstaclesCords.set(this.draw2, [250, 260, 170, 130]);
-        this.obstaclesCords.set(this.draw3, [250, 260, 300, 350]);
-        this.obstaclesCords.set(this.draw4, [250, 260, 410, 530]);
-
         this.obstacles = this.generateObstacles(this.currentTrack);
+        this.pointers = this.generatePointers(this.currentTrack);
+
     }
 
     generateObstacles(truck) {
-        let obstacles = [];
-
-        for(let i = 0; i< 4; i++) {
+        let obstacles = []
+        console.log(truck.lineCords);
+        truck.lineCords.forEach( cord => {
             let sign = Math.round(Math.random()) * 2 - 1;
             let horizontalRand = sign * Math.floor(Math.random()*100);
             let verticalRand = sign * Math.floor(Math.random()*30);
-            let cords = this.obstaclesCords.get(truck);
-            obstacles.push(new Obstacle(this.ctx, cords[i] + horizontalRand, -1000 + i*200 + verticalRand))
-        }
+            obstacles.push(new Obstacle(this.ctx, cord.x + horizontalRand - Obstacle.WIDTH/2, cord.y + verticalRand))
+
+        })
+        return obstacles;
+    }
+
+    generatePointers(truck) {
+        let obstacles = []
+        console.log(truck.lineCords);
+        truck.lineCords.forEach( cord => {
+            let sign = Math.round(Math.random()) * 2 - 1;
+            let horizontalRand = sign * Math.floor(Math.random()*100);
+            let verticalRand = sign * Math.floor(Math.random()*30) + 50;
+            obstacles.push(new Pointer(this.ctx, cord.x + horizontalRand - Obstacle.WIDTH/2, cord.y + verticalRand))
+
+        })
         return obstacles;
     }
 
     draw() {
-        this.currentTrack(this.current);
+        this.currentTrack.draw(this.current);
         if (this.prevTrack !== null) {
-            this.prevTrack(this.prev);
+            this.prevTrack.draw(this.prev);
         }
         if (this.current === 1000) {
-            let rand = Math.floor(Math.random()*4);
             this.prevTrack = this.currentTrack;
-            // this.currentTrack = this.tracks[rand];
-            this.currentTrack = this.tracks[0];
+            this.currentTrack = new RoadPreset(this.ctx);
             this.obstacles.push.apply(this.obstacles, this.generateObstacles(this.currentTrack));
+            this.pointers.push.apply(this.pointers, this.generatePointers(this.currentTrack));
             this.prev = 1000;
             this.current = 0;
             this.switchCounter++;
@@ -212,10 +271,172 @@ class Road {
                 this.obstacles.shift();
             }
         }
-        console.log("current=" + this.current);
+        // console.log("current=" + this.current);
     }
 
-    drawInit(Y) {
+    intersects(a,b,c,d,p,q,r,s) {
+        let det, gamma, lambda;
+        det = (c - a) * (s - q) - (r - p) * (d - b);
+        if (det === 0) {
+            // lines are paralel
+            return false;
+        } else {
+            lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
+            gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
+            return (-0.1 < lambda && lambda < 1.1) && (-0.1 < gamma && gamma < 1.1);
+        }
+    };
+    calculateRoadColiision(x, y) {
+        let res = false;
+        let trucks = [this.currentTrack];
+        if (this.prevTrack !== null) {
+            trucks.push(this.prevTrack);
+        }
+        console.log(x + "," + y);
+        trucks.forEach(truck => {
+            for(let i = 0; i < truck.lineCords.length - 1 ; i++) {
+                // console.log(truck.lineCords);
+                if (truck.lineCords[i+1].y >= y &&
+                    truck.lineCords[i].y <= y) {
+                    let leftLine =  {start: {x: truck.lineCords[i].x - (Road.ROAD_WIDTH + 50)/2 , y: truck.lineCords[i].y - 30},
+                        end: {x: truck.lineCords[i+1].x - (Road.ROAD_WIDTH + 50)/2 , y: truck.lineCords[i+1].y - 30}};
+                    let rightLine =  {start: {x: truck.lineCords[i].x + (Road.ROAD_WIDTH + 100)/2 , y: truck.lineCords[i].y - 30},
+                        end: {x: truck.lineCords[i+1].x + (Road.ROAD_WIDTH + 100)/2 , y: truck.lineCords[i+1].y - 30}};
+                    let leftLine2 =  {start: {x: truck.lineCords[i].x - (Road.ROAD_WIDTH + 50)/2 , y: truck.lineCords[i].y + 30},
+                        end: {x: truck.lineCords[i+1].x - (Road.ROAD_WIDTH + 50)/2 , y: truck.lineCords[i+1].y + 30}};
+                    let rightLine2 =  {start: {x: truck.lineCords[i].x + (Road.ROAD_WIDTH + 100)/2 , y: truck.lineCords[i].y + 30},
+                        end: {x: truck.lineCords[i+1].x + (Road.ROAD_WIDTH + 100)/2 , y: truck.lineCords[i+1].y + 30}};
+
+                    if ( (this.intersects(leftLine.start.x, leftLine.start.y,
+                                            leftLine.end.x, leftLine.end.y,
+                                            x, y,x + Car.CAR_WIDTH, y) &&
+                            this.intersects(leftLine2.start.x, leftLine2.start.y,
+                                leftLine2.end.x, leftLine2.end.y,
+                                x, y,x + Car.CAR_WIDTH, y)) ||
+                        (this.intersects(rightLine.start.x, rightLine.start.y,
+                                rightLine.end.x, rightLine.end.y,
+                                x, y,x + Car.CAR_WIDTH, y) &&
+                            this.intersects(rightLine2.start.x, rightLine2.start.y,
+                                rightLine2.end.x, rightLine2.end.y,
+                                x, y,x + Car.CAR_WIDTH, y)) ) {
+                            res = true;
+                    }
+                }
+            }
+        })
+
+        return res;
+    }
+
+    move()  {
+        this.current += Road.STEP;
+        this.prev += Road.STEP;
+        this.obstacles.forEach(obstacle => {
+            obstacle.move();
+        })
+
+        this.pointers.forEach(obstacle => {
+            obstacle.move();
+        })
+    }
+}
+
+class RoadPreset {
+    ctx;
+    offset;
+    lineCords;
+
+    constructor(ctx) {
+        this.ctx = ctx;
+        this.offset = 100 + Math.floor(Math.random()*550);
+        this.offset2 = 100 + Math.floor(Math.random()*550);
+        this.lineCords = this.lineCords = [  {x: 300, y: -1000 },
+            {x: 300, y: -800 },
+            {x: this.offset, y: -600},
+            {x: this.offset2, y: -400 },
+            {x: 300, y: -200 },
+            {x: 300, y: 0 }]
+    }
+
+    draw(Y) {
+        this.ctx.translate(0,0);
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.setLineDash([]);
+        this.ctx.strokeStyle = this.getSidePattern(Y);
+        this.ctx.lineJoin = 'round';
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, -800 + Y);
+        this.ctx.lineTo(this.offset, -600 + Y);
+        this.ctx.lineTo(this.offset2, -400 + Y);
+        this.ctx.lineTo(300, -200 + Y);
+        this.ctx.lineTo(300, 0 + Y);
+        this.ctx.lineWidth = Road.ROAD_WIDTH + 30;
+        this.ctx.stroke();
+        this.ctx.closePath();
+
+
+        this.ctx.beginPath();
+        this.ctx.setLineDash([]);
+        this.ctx.strokeStyle = 'grey';
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, -800 + Y);
+        this.ctx.lineTo(this.offset, -600 + Y);
+        this.ctx.lineTo(this.offset2, -400 + Y);
+        this.ctx.lineTo(300, -200 + Y);
+        this.ctx.lineTo(300, 0 + Y);
+        this.ctx.lineWidth = Road.ROAD_WIDTH;
+        this.ctx.stroke();
+        this.ctx.closePath();
+
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'white';
+        this.ctx.setLineDash([40, 10]);
+        this.ctx.moveTo(300,-1000 + Y);
+        this.ctx.lineTo(300, -800 + Y);
+        this.ctx.lineTo(this.offset, -600 + Y);
+        this.ctx.lineTo(this.offset2, -400 + Y);
+        this.ctx.lineTo(300, -200 + Y);
+        this.ctx.lineTo(300, 0 + Y);
+        // this.ctx.lineWidth = 15;
+        this.ctx.lineWidth = 5;
+        this.ctx.stroke();
+        this.ctx.closePath();
+        this.ctx.restore();
+        this.lineCords = [  {x: 300, y: -1000 + Y},
+                            {x: 300, y: -800 + Y},
+                            {x: this.offset, y: -600 + Y},
+                            {x: this.offset2, y: -400 + Y},
+                            {x: 300, y: -200 + Y},
+                            {x: 300, y: 0 + Y}]
+    }
+
+    getSidePattern(Y) {
+        let patternCanvas = document.createElement('canvas');
+        let patternContext = patternCanvas.getContext('2d');
+        patternCanvas.width = 20;
+        patternCanvas.height = 1000;
+        patternContext.fillStyle = 'white';
+        patternContext.fillRect(0, -1000, patternCanvas.width, 2000);
+        patternContext.strokeStyle = 'red';
+        patternContext.setLineDash([20,20]);
+        patternContext.lineWidth = 40;
+        patternContext.moveTo(10, -1000 + Y);
+        patternContext.lineTo(10, 1000)
+        patternContext.stroke();
+        return  this.ctx.createPattern(patternCanvas, 'repeat');
+    }
+}
+
+class RoadPresetInit extends RoadPreset {
+
+    constructor(ctx) {
+        super(ctx);
+        this.lineCords = [  {x: 300, y: 0},
+            {x: 300, y: 200 }];
+    }
+
+    draw(Y) {
         this.ctx.save();
 
         this.ctx.translate(0,0);
@@ -252,211 +473,15 @@ class Road {
         this.ctx.setLineDash([40, 10]);
         this.ctx.moveTo(300,-1000 + Y);
         this.ctx.lineTo(300, 800 + Y);
-        this.ctx.lineWidth = 15;
+        this.ctx.lineWidth = 5;
+        // this.ctx.lineWidth = 15;
         this.ctx.stroke();
         this.ctx.closePath();
 
         this.ctx.restore();
-    }
 
-    draw1(Y) {
-        this.ctx.translate(0,0);
-        this.ctx.save();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = this.getSidePattern(Y);
-        this.ctx.lineJoin = 'round';
-        // this.ctx.fillStyle = "black";
-        // this.ctx.fillRect(300, -1000 + Y, 300, 300);
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(500, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-
-        this.ctx.lineWidth = Road.ROAD_WIDTH + 30;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = 'grey';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(500, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'white';
-        this.ctx.setLineDash([40, 10]);
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(500, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = 15;
-        this.ctx.stroke();
-        this.ctx.closePath();
-        this.ctx.restore();
-    }
-
-    draw2(Y) {
-        this.ctx.translate(0,0);
-        this.ctx.save();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = this.getSidePattern(Y);
-        this.ctx.lineJoin = 'round';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(170, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH + 30;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = 'grey';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(170, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'white';
-        this.ctx.setLineDash([40, 10]);
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(170, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = 15;
-        this.ctx.stroke();
-        this.ctx.closePath();
-        this.ctx.restore();
-    }
-
-    draw3(Y) {
-        this.ctx.translate(0,0);
-        this.ctx.save();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = this.getSidePattern(Y);
-        this.ctx.lineJoin = 'round';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(400, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH + 30;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = 'grey';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(400, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'white';
-        this.ctx.setLineDash([40, 10]);
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(400, -400 + Y);
-        this.ctx.lineTo(300, -200 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = 15;
-        this.ctx.stroke();
-        this.ctx.restore();
-        this.ctx.closePath();
-    }
-
-    draw4(Y) {
-        this.ctx.translate(0,0);
-        this.ctx.save();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = this.getSidePattern(Y);
-        this.ctx.lineJoin = 'round';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(600, -400 + Y);
-        this.ctx.lineTo(300, -100 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH + 30;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.setLineDash([]);
-        this.ctx.strokeStyle = 'grey';
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(600, -400 + Y);
-        this.ctx.lineTo(300, -100 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = Road.ROAD_WIDTH;
-        this.ctx.stroke();
-        this.ctx.closePath();
-
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = 'white';
-        this.ctx.setLineDash([40, 10]);
-        this.ctx.moveTo(300,-1000 + Y);
-        this.ctx.lineTo(300, -800 + Y);
-        this.ctx.lineTo(600, -400 + Y);
-        this.ctx.lineTo(300, -100 + Y);
-        this.ctx.lineTo(300, 0 + Y);
-        this.ctx.lineWidth = 15;
-        this.ctx.stroke();
-        this.ctx.closePath();
-        this.ctx.restore();
-    }
-
-    getSidePattern(Y) {
-        let patternCanvas = document.createElement('canvas');
-        let patternContext = patternCanvas.getContext('2d');
-        patternCanvas.width = 20;
-        patternCanvas.height = 1000;
-        patternContext.fillStyle = 'white';
-        patternContext.fillRect(0, -1000, patternCanvas.width, 2000);
-        patternContext.strokeStyle = 'red';
-        patternContext.setLineDash([20,20]);
-        patternContext.lineWidth = 40;
-        patternContext.moveTo(10, -1000 + Y);
-        patternContext.lineTo(10, 1000)
-        patternContext.stroke();
-        return  this.ctx.createPattern(patternCanvas, 'repeat');
-    }
-
-    move()  {
-        this.current += Road.STEP;
-        this.prev += Road.STEP;
-        this.obstacles.forEach(obstacle => {
-            obstacle.move();
-        })
+        this.lineCords = [  {x: 300, y: -1000 + Y},
+            {x: 300, y: 800 + Y}];
     }
 }
 
