@@ -21,24 +21,23 @@ class Game {
       this.ctx = this.canvas.getContext('2d');
     }
     this.drawBackground();
-      this.road = new Road(this.ctx);
+    this.road = new Road(this.ctx);
 
-      // this.road = new Road(this.ctx, Game.ROAD_X, Game.ROAD_Y);
     this.road.draw();
 
     this.car = new Car(this.ctx, Game.ROAD_X + 140, Game.CAR_Y);
     this.car.draw();
     this.scoreboard = new Scoreboard(this.ctx);
     this.keyHandler = new KeyHandler();
-    // this.obstacles = new Obstacle(this.ctx, 300, 200, 0);
 
 
     this.keyInterval = setInterval(e => {
+        this.road.move(5);
+
         if (this.keyHandler.arrowUp) {
-            this.road.move();
+            this.road.move(5);
         }
         if (this.keyHandler.arrowLeft) {
-            // console.log(this.car, this.road.obstacles);
             this.car.direction = directions.LEFT;
             this.car.moveLeft();
 
@@ -64,7 +63,8 @@ class Game {
   }
 
   clear() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.translate(0, 0);
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
   redraw() {
@@ -73,8 +73,7 @@ class Game {
       this.road.draw();
       this.car.draw();
 
-      if (this.road.calculateRoadColiision(this.car.postition, Game.CAR_Y)) {
-          console.log("XXX")
+      if (this.road.calculateRoadCollision(this.car.postition, Game.CAR_Y)) {
           this.gameOver();
           return;
       }
@@ -88,15 +87,19 @@ class Game {
           }
       });
 
-      this.road.obstacles.forEach(obstacle => {
-          if (obstacle.calculateHit(this.car)) {
-              this.gameOver();
-              console.log("HIT")
-              return;
-          } else {
-              obstacle.draw()
-          }
-      });
+      try {
+          this.road.obstacles.forEach(obstacle => {
+              if (obstacle.calculateHit(this.car)) {
+                  this.gameOver();
+                  throw new DOMException();
+              } else {
+                  obstacle.draw()
+              }
+          });
+      } catch (e) {
+          //do nothing, just to break forEach
+      }
+
 
 
 
@@ -105,6 +108,7 @@ class Game {
 
   gameOver() {
       window.clearInterval(this.keyInterval);
+      this.clear();
       this.clear();
       this.ctx.save();
       this.ctx.translate(200, 200);
@@ -116,7 +120,7 @@ class Game {
   }
 }
 
-class Hitable {
+class Hittable {
     x;
     y;
     ctx;
@@ -126,13 +130,10 @@ class Hitable {
         this.ctx = ctx;
         this.x = x;
         this.y = y;
-        // this.height = 0;
-        // this.width = 0;
     }
 
-    move() {
-        // console.log("obs pos = " + this.x);
-        this.y += 10;
+    move(step) {
+        this.y += step;
     }
 
     pointInRect(x1, y1, x2, y2, x, y)
@@ -154,7 +155,7 @@ class Hitable {
 }
 
 
-class Obstacle extends Hitable {
+class Obstacle extends Hittable {
     static WIDTH = 100;
     static HEIGHT = 20;
     constructor(ctx, x, y) {
@@ -171,7 +172,7 @@ class Obstacle extends Hitable {
     }
 }
 
-class Pointer extends Hitable {
+class Pointer extends Hittable {
     static WIDTH = 40;
     static HEIGHT = 40;
     hit
@@ -185,7 +186,7 @@ class Pointer extends Hitable {
     draw() {
         if (!this.hit) {
             this.ctx.save();
-            this.ctx.fillStyle = "blue";
+            this.ctx.fillStyle = "yellow";
             this.ctx.fillRect(this.x, this.y, Pointer.WIDTH, Pointer.HEIGHT);
             this.ctx.restore();
         }
@@ -200,7 +201,6 @@ class Road {
     ctx;
     static ROAD_WIDTH = 300;
     init
-    tracks;
     currentTrack;
     prevTrack;
     static STEP = 10;
@@ -211,7 +211,6 @@ class Road {
     constructor(ctx) {
         this.ctx = ctx;
         this.currentTrack = new RoadPresetInit(this.ctx);
-        // this.currentTrack = this.drawInit;
 
         this.prevTrack = null;
         this.current = 0;
@@ -225,7 +224,6 @@ class Road {
 
     generateObstacles(truck) {
         let obstacles = []
-        console.log(truck.lineCords);
         truck.lineCords.forEach( cord => {
             let sign = Math.round(Math.random()) * 2 - 1;
             let horizontalRand = sign * Math.floor(Math.random()*100);
@@ -238,12 +236,11 @@ class Road {
 
     generatePointers(truck) {
         let obstacles = []
-        console.log(truck.lineCords);
         truck.lineCords.forEach( cord => {
             let sign = Math.round(Math.random()) * 2 - 1;
             let horizontalRand = sign * Math.floor(Math.random()*100);
             let verticalRand = sign * Math.floor(Math.random()*30) + 50;
-            obstacles.push(new Pointer(this.ctx, cord.x + horizontalRand - Obstacle.WIDTH/2, cord.y + verticalRand))
+            obstacles.push(new Pointer(this.ctx, cord.x + horizontalRand - Pointer.WIDTH/2, cord.y + verticalRand))
 
         })
         return obstacles;
@@ -254,48 +251,47 @@ class Road {
         if (this.prevTrack !== null) {
             this.prevTrack.draw(this.prev);
         }
-        if (this.current === 1000) {
+        if (this.current === 1000 || this.current === 1005) {
+            console.log("HOP");
             this.prevTrack = this.currentTrack;
             this.currentTrack = new RoadPreset(this.ctx);
             this.obstacles.push.apply(this.obstacles, this.generateObstacles(this.currentTrack));
             this.pointers.push.apply(this.pointers, this.generatePointers(this.currentTrack));
-            this.prev = 1000;
+            this.prev = this.current;
             this.current = 0;
             this.switchCounter++;
             if (this.switchCounter >= 3) {
                 this.switchCounter = 3; // blocking further growth
                 // removing obsolete obstacles
-                this.obstacles.shift();
-                this.obstacles.shift();
-                this.obstacles.shift();
-                this.obstacles.shift();
+                for(let i=0; i<4; i++) {
+                    this.obstacles.shift();
+                    this.pointers.shift();
+                }
             }
         }
-        // console.log("current=" + this.current);
     }
 
-    intersects(a,b,c,d,p,q,r,s) {
-        let det, gamma, lambda;
-        det = (c - a) * (s - q) - (r - p) * (d - b);
+    intersects(firstX1,firstY1, firstX2,firstY2,secondX1, secondY1,secondX2,secondY2) {
+        let det, lambda, lambda2;
+        det = (firstX2 - firstX1) * (secondY2 - secondY1) - (secondX2 - secondX1) * (firstY2 - firstY1);
         if (det === 0) {
-            // lines are paralel
+            // lines are parallel
             return false;
         } else {
-            lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
-            gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
-            return (-0.1 < lambda && lambda < 1.1) && (-0.1 < gamma && gamma < 1.1);
+            lambda = ((secondY2 - secondY1) * (secondX2 - firstX1) + (secondX1 - secondX2) * (secondY2 - firstY1)) / det;
+            lambda2 = ((firstY1 - firstY2) * (secondX2 - firstX1) + (firstX2 - firstX1) * (secondY2 - firstY1)) / det;
+            return (-0.1 < lambda && lambda < 1.1) && (-0.1 < lambda2 && lambda2 < 1.1);
         }
     };
-    calculateRoadColiision(x, y) {
+    
+    calculateRoadCollision(x, y) {
         let res = false;
         let trucks = [this.currentTrack];
         if (this.prevTrack !== null) {
             trucks.push(this.prevTrack);
         }
-        console.log(x + "," + y);
         trucks.forEach(truck => {
             for(let i = 0; i < truck.lineCords.length - 1 ; i++) {
-                // console.log(truck.lineCords);
                 if (truck.lineCords[i+1].y >= y &&
                     truck.lineCords[i].y <= y) {
                     let leftLine =  {start: {x: truck.lineCords[i].x - (Road.ROAD_WIDTH + 50)/2 , y: truck.lineCords[i].y - 30},
@@ -328,15 +324,15 @@ class Road {
         return res;
     }
 
-    move()  {
-        this.current += Road.STEP;
-        this.prev += Road.STEP;
+    move(step)  {
+        this.current += step;
+        this.prev += step;
         this.obstacles.forEach(obstacle => {
-            obstacle.move();
+            obstacle.move(step);
         })
 
         this.pointers.forEach(obstacle => {
-            obstacle.move();
+            obstacle.move(step);
         })
     }
 }
@@ -432,8 +428,8 @@ class RoadPresetInit extends RoadPreset {
 
     constructor(ctx) {
         super(ctx);
-        this.lineCords = [  {x: 300, y: 0},
-            {x: 300, y: 200 }];
+        this.lineCords = [  {x: 300, y: -300},
+            {x: 300, y: 0 }];
     }
 
     draw(Y) {
