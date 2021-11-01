@@ -12,48 +12,71 @@ class Game {
   static ROAD_X = 250;
   static ROAD_Y = 0;
   static CAR_Y = 400;
+  enterInterval;
   keyInterval;
   obstacles;
 
   constructor(canvasId) {
-    this.canvas = document.getElementById(canvasId);
-    if (this.canvas.getContext) {
-      this.ctx = this.canvas.getContext('2d');
-    }
-    this.drawBackground();
-    this.road = new Road(this.ctx);
-
-    this.road.draw();
-
-    this.car = new Car(this.ctx, Game.ROAD_X + 140, Game.CAR_Y);
-    this.car.draw();
-    this.scoreboard = new Scoreboard(this.ctx);
-    this.keyHandler = new KeyHandler();
-
-
-    this.keyInterval = setInterval(e => {
-        this.road.move(5);
-
-        if (this.keyHandler.arrowUp) {
-            this.road.move(5);
-        }
-        if (this.keyHandler.arrowLeft) {
-            this.car.direction = directions.LEFT;
-            this.car.moveLeft();
-
-
-        } else if (this.keyHandler.arrowRight) {
-            this.car.direction = directions.RIGHT;
-            this.car.moveRight();
-        } else {
-            this.car.direction = directions.NONE;
-        }
-        this.redraw();
-    }, 20)
-
+      this.canvas = document.getElementById(canvasId);
+      if (this.canvas.getContext) {
+        this.ctx = this.canvas.getContext('2d');
+      }
+      this.keyHandler = new KeyHandler();
+      this.enterInterval = setInterval(e => {
+          if (this.keyHandler.enter) {
+                this.start();
+            }
+      });
+      this.ctx.save();
+      this.ctx.translate(0, 0);
+      this.ctx.fillStyle = "black";
+      this.ctx.fillRect(0,0, this.canvas.width, this.canvas.height)
+      this.ctx.font = 'bold 30px serif';
+      this.ctx.fillStyle = "white";
+      this.ctx.fillText("Instructions:" , 250, 40, 300);
+      this.ctx.font = 'bold 22px serif';
+      this.ctx.fillText("1) Avoid hitting black walls and going off the road." , 0, 100);
+      this.ctx.fillText("2) Collect yellow rectangles to score points." , 0, 150);
+      this.ctx.fillText("3) Use right and left arrows to turn." , 0, 200);
+      this.ctx.fillText("4) Keep arrow up pressed to accelerate." , 0, 250);
+      this.ctx.fillText("Press enter to start. Good luck!" , 180, 350);
+      this.ctx.restore();
   }
 
 
+    start() {
+        this.clear();
+        window.clearInterval(this.enterInterval);
+        this.drawBackground();
+        this.road = new Road(this.ctx);
+
+        this.road.draw();
+
+        this.car = new Car(this.ctx, Game.ROAD_X + 140, Game.CAR_Y);
+        this.car.draw();
+        this.scoreboard = new Scoreboard(this.ctx);
+
+
+        this.keyInterval = setInterval(e => {
+            this.road.move(5);
+
+            if (this.keyHandler.arrowUp) {
+                this.road.move(10);
+            }
+            if (this.keyHandler.arrowLeft) {
+                this.car.direction = directions.LEFT;
+                this.car.moveLeft();
+
+
+            } else if (this.keyHandler.arrowRight) {
+                this.car.direction = directions.RIGHT;
+                this.car.moveRight();
+            } else {
+                this.car.direction = directions.NONE;
+            }
+            this.redraw();
+        }, 20)
+  }
 
   drawBackground() {
       this.ctx.save();
@@ -79,29 +102,25 @@ class Game {
       }
 
       this.road.pointers.forEach(obstacle => {
+          obstacle.draw()
           if (obstacle.calculateHit(this.car) && obstacle.hit === false) {
               this.scoreboard.increment();
               obstacle.hit = true;
-          } else {
-              obstacle.draw()
           }
       });
 
       try {
           this.road.obstacles.forEach(obstacle => {
+              obstacle.draw()
               if (obstacle.calculateHit(this.car)) {
                   this.gameOver();
                   throw new DOMException();
-              } else {
-                  obstacle.draw()
               }
           });
       } catch (e) {
+          // console.log(e.message)
           //do nothing, just to break forEach
       }
-
-
-
 
       this.scoreboard.draw();
   }
@@ -116,6 +135,7 @@ class Game {
       this.ctx.fillStyle = "black";
       this.ctx.fillText("GAME OVER!" , 25, 25, 300);
       this.ctx.restore();
+      this.scoreboard.draw();
 
   }
 }
@@ -136,10 +156,10 @@ class Hittable {
         this.y += step;
     }
 
-    pointInRect(x1, y1, x2, y2, x, y)
-    {
-        return (x >= x1 && x <= x2 && y <= y1 && y >= y2);
-    }
+    // pointInRect(x1, y1, x2, y2, x, y)
+    // {
+    //     return (x >= x1 && x <= x2 && y <= y1 && y >= y2);
+    // }
 
     calculateHit(car) {
         // x - car.postition
@@ -147,10 +167,15 @@ class Hittable {
         // y1 - this.y + Obstacle.HEIGHT
         // x2 - this.x + Obstacle.WIDTH
         // y2 - this.y
-        let res = this.pointInRect(this.x, this.y + this.height, this.x + this.width, this.y, car.postition, Game.CAR_Y) ||
-            this.pointInRect(this.x , this.y + this.height, this.x + this.width, this.y, car.postition + Car.CAR_WIDTH, Game.CAR_Y);
-        return res;
-
+        let carVar =     {x: car.postition,  y: car.y,  w: Car.CAR_WIDTH, h: Car.CAR_HEIGHT};
+        let obstacleVar= {x: this.x, y: this.y, w: this.width,    h: this.height};
+        if (carVar.x <= obstacleVar.x + obstacleVar.w &&
+                carVar.x + carVar.w >= obstacleVar.x &&
+                carVar.y <= obstacleVar.y + obstacleVar.h &&
+                carVar.h + carVar.y >= obstacleVar.y) {
+                return true;
+         }
+        return  false;
     }
 }
 
@@ -193,8 +218,6 @@ class Pointer extends Hittable {
     }
 }
 
-
-
 class Road {
     current;
     prev;
@@ -219,29 +242,40 @@ class Road {
 
         this.obstacles = this.generateObstacles(this.currentTrack);
         this.pointers = this.generatePointers(this.currentTrack);
-
     }
 
     generateObstacles(truck) {
         let obstacles = []
+        let counter = 0;
         truck.lineCords.forEach( cord => {
-            let sign = Math.round(Math.random()) * 2 - 1;
-            let horizontalRand = sign * Math.floor(Math.random()*100);
-            let verticalRand = sign * Math.floor(Math.random()*30);
-            obstacles.push(new Obstacle(this.ctx, cord.x + horizontalRand - Obstacle.WIDTH/2, cord.y + verticalRand))
-
+            if (counter%2 === 1) {
+                let sign = Math.round(Math.random()) * 2 - 1;
+                let horizontalRand = sign * Math.floor(Math.random() * 100);
+                let verticalRand = sign * Math.floor(Math.random() * 30);
+                if (counter === 5 && verticalRand > 0) {
+                    verticalRand = -verticalRand; // so they dont appear en route
+                }
+                obstacles.push(new Obstacle(this.ctx, cord.x + horizontalRand - Obstacle.WIDTH / 2, cord.y + verticalRand))
+            }
+            counter++;
         })
         return obstacles;
     }
 
     generatePointers(truck) {
         let obstacles = []
+        let counter = 0;
         truck.lineCords.forEach( cord => {
-            let sign = Math.round(Math.random()) * 2 - 1;
-            let horizontalRand = sign * Math.floor(Math.random()*100);
-            let verticalRand = sign * Math.floor(Math.random()*30) + 50;
-            obstacles.push(new Pointer(this.ctx, cord.x + horizontalRand - Pointer.WIDTH/2, cord.y + verticalRand))
-
+            if (counter%2 === 0) {
+                let sign = Math.round(Math.random()) * 2 - 1;
+                let horizontalRand = sign * Math.floor(Math.random() * 100);
+                let verticalRand = sign * Math.floor(Math.random() * 30);
+                if (counter === 0 && verticalRand < 0) {
+                    verticalRand = -verticalRand; // so they dont appear en route
+                }
+                obstacles.push(new Pointer(this.ctx, cord.x + horizontalRand - Pointer.WIDTH / 2, cord.y + verticalRand))
+            }
+            counter++;
         })
         return obstacles;
     }
@@ -251,19 +285,19 @@ class Road {
         if (this.prevTrack !== null) {
             this.prevTrack.draw(this.prev);
         }
-        if (this.current === 1000 || this.current === 1005) {
-            console.log("HOP");
+        if (this.current >= 1000 ) {
             this.prevTrack = this.currentTrack;
             this.currentTrack = new RoadPreset(this.ctx);
-            this.obstacles.push.apply(this.obstacles, this.generateObstacles(this.currentTrack));
-            this.pointers.push.apply(this.pointers, this.generatePointers(this.currentTrack));
-            this.prev = this.current;
+            this.obstacles = this.obstacles.concat(this.generateObstacles(this.currentTrack));
+            this.pointers = this.pointers.concat(this.generatePointers(this.currentTrack));
+            this.prev = 1000;
+                // this.current;
             this.current = 0;
             this.switchCounter++;
             if (this.switchCounter >= 3) {
-                this.switchCounter = 3; // blocking further growth
+                this.switchCounter = 0; // blocking further growth
                 // removing obsolete obstacles
-                for(let i=0; i<4; i++) {
+                for(let i=0; i<3; i++) {
                     this.obstacles.shift();
                     this.pointers.shift();
                 }
@@ -282,7 +316,7 @@ class Road {
             lambda2 = ((firstY1 - firstY2) * (secondX2 - firstX1) + (firstX2 - firstX1) * (secondY2 - firstY1)) / det;
             return (-0.1 < lambda && lambda < 1.1) && (-0.1 < lambda2 && lambda2 < 1.1);
         }
-    };
+    }
     
     calculateRoadCollision(x, y) {
         let res = false;
@@ -554,6 +588,13 @@ class Car {
         this.drawTire(35, 45);
         this.ctx.fillStyle = 'red';
         this.ctx.fillRect(0,0, Car.CAR_WIDTH, Car.CAR_HEIGHT);
+        this.ctx.fillRect(-2,60, Car.CAR_WIDTH + 4, 5);
+        this.ctx.fillStyle = "royalblue";
+        this.ctx.fillRect(2.5,10, 30, 10);
+        this.ctx.fillRect(2.5, 40, 30,15);
+        this.ctx.fillRect(1.5,15, 2, 35);
+        this.ctx.fillRect(31.5,15, 2, 35);
+
         this.ctx.restore();
     }
 
@@ -567,6 +608,12 @@ class Car {
         this.drawTire(35, 45);
         this.ctx.fillStyle = 'red';
         this.ctx.fillRect(0,0, Car.CAR_WIDTH, Car.CAR_HEIGHT);
+        this.ctx.fillRect(-2,60, Car.CAR_WIDTH + 4, 5);
+        this.ctx.fillStyle = "royalblue";
+        this.ctx.fillRect(2.5,10, 30, 10);
+        this.ctx.fillRect(2.5, 40, 30,15);
+        this.ctx.fillRect(1.5,15, 2, 35);
+        this.ctx.fillRect(31.5,15, 2, 35);
         this.ctx.restore();
     }
 
@@ -580,6 +627,12 @@ class Car {
         this.drawTire(35, 45);
         this.ctx.fillStyle = 'red';
         this.ctx.fillRect(0,0, Car.CAR_WIDTH, Car.CAR_HEIGHT);
+        this.ctx.fillRect(-2,60, Car.CAR_WIDTH + 4, 5);
+        this.ctx.fillStyle = "royalblue";
+        this.ctx.fillRect(2.5,10, 30, 10);
+        this.ctx.fillRect(2.5, 40, 30,15);
+        this.ctx.fillRect(1.5,15, 2, 35);
+        this.ctx.fillRect(31.5,15, 2, 35);
         this.ctx.restore();
     }
 
@@ -613,6 +666,7 @@ class KeyHandler {
         this.arrowDown = false;
         this.arrowRight = false;
         this.arrowLeft = false;
+        this.enter = false;
 
         window.addEventListener("keydown", e => {
             if (e.key === "ArrowUp") {
@@ -626,6 +680,9 @@ class KeyHandler {
             }
             if (e.key === "ArrowRight") {
                 this.arrowRight = true;
+            }
+            if (e.key === "Enter") {
+                this.enter = true;
             }
         }, true);
 
